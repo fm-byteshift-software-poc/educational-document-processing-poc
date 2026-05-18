@@ -128,6 +128,10 @@ async def _process_document_background(job_id: str, tenant_id: str, doc_id: str)
         await update_document_status(doc_id, tenant_id, "completed")
 
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"[JOB {job_id}] Processing failed: {type(e).__name__}: {e}")
+        
         # On any failure, mark job and document as failed
         await update_job_status(job_id, tenant_id, "failed", error_message=str(e))
         await update_document_status(doc_id, tenant_id, "failed")

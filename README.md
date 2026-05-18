@@ -1,55 +1,155 @@
 # Educational Document Processing PoC
 
-A proof of concept demonstrating a tenant isolated pipeline that converts uploaded educational documents into structured five slide presentations. The focus is on data layer tenant isolation and asynchronous processing.
+A proof of concept demonstrating a tenant isolated pipeline that converts uploaded educational documents into structured five slide presentations using AI (Llama 3.1). The focus is on data layer tenant isolation, asynchronous processing, and intelligent content transformation.
+
+## Quick Start
+
+### Backend Setup
+
+```bash
+# 1. Navigate to the backend directory
+cd backend
+
+# 2. Create and activate virtual environment
+python -m venv .venv
+source .venv/Scripts/activate  # Windows
+# source .venv/bin/activate    # Linux/Mac
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Create .env file from example
+cp .env.example .env
+# Edit .env and add your HuggingFace API token:
+# HF_API_TOKEN=your_token_here
+
+# 5. Run the server
+uvicorn src.main:app --reload
+```
+
+Backend runs on: http://localhost:8000  
+API Docs: http://localhost:8000/docs
+
+### Frontend Setup
+
+```bash
+# 1. Navigate to the frontend directory
+cd frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Create .env file
+echo "VITE_API_BASE_URL=http://localhost:8000" > .env
+
+# 4. Run the development server
+npm run dev
+```
+
+Frontend runs on: http://localhost:3000
+
+## Sample Test Data
+
+The `sample_data/` folder contains two pre prepared test documents:
+
+1. `machine_learning_intro.txt` - Introduction to Neural Networks and Deep Learning  
+   Dense technical content about ANN architectures, training, and applications
+
+2. `distributed_systems_raw.txt` - Distributed Systems Fundamentals  
+   Complex concepts covering CAP theorem, consensus algorithms, and observability
+
+These files are intentionally unformatted to test the AI ability to extract structure and create pedagogical slides.
+
+## Test User Credentials
+
+### User 1: Alice (Educational Organization)
+
+- Email: `alice@eduorg.com`
+- Password: `demo1234`
+- Tenant ID: `t-alpha-0001-0000-0000-000000000001`
+- Pre loaded documents: 2 (Photosynthesis, Cell Division)
+
+### User 2: Bob (Training Company)
+
+- Email: `bob@trainco.com`
+- Password: `demo5678`
+- Tenant ID: `t-beta-0002-0000-0000-000000000002`
+- Pre loaded documents: 1 (Workplace Safety)
+
+## Workflow
+
+1. Login with Alice or Bob credentials
+2. Upload a document (PDF or TXT, max 5MB) or use sample data
+3. Click "Process" to queue the document for AI transformation
+4. Wait ~10-20 seconds (auto refresh shows progress)
+5. Click "View" to see the generated five slide presentation
+6. Test isolation: Login as Bob and verify you cannot see Alice documents
 
 ## Tech Stack
 
-- Backend: FastAPI, Python 3.12, SQLite via aiosqlite, Pydantic v2
-- LLM: Llama via HuggingFace Inference Router using the OpenAI async client
-- Auth: JWT via python jose and bcrypt
-- Frontend: React 19, TypeScript 5, Vite 6, Tailwind CSS with DaisyUI theme dim
-
-## Quick Start Backend
-
-1. Navigate to the backend directory
-2. Install dependencies with pip install requirements.txt
-3. Create a .env file from .env.example and add your HuggingFace token
-4. Run the server with uvicorn src.main:app reload
-   The application automatically creates the database and seeds demo data for Alice and Bob tenants on first startup.
+| Layer    | Technology                                                               |
+| -------- | ------------------------------------------------------------------------ |
+| Backend  | FastAPI, Python 3.12, SQLite (aiosqlite), Pydantic v2                    |
+| LLM      | Llama 3.1 8B via HuggingFace Inference Router (OpenAI compatible client) |
+| Auth     | JWT (python-jose), bcrypt password hashing                               |
+| Frontend | React 19, TypeScript 5, Vite 6, Tailwind CSS + DaisyUI (dim theme)       |
+| Async    | asyncio background workers, polling for job status                       |
 
 ## API Endpoints
 
-- GET health returns health status
-- POST api/v1/auth/login returns a JWT token
-- POST api/v1/documents/upload accepts PDF or TXT files under five megabytes
-- POST api/v1/jobs queues a document for processing
-- GET api/v1/jobs/job_id polls processing status
-- GET api/v1/presentations/job_id retrieves the generated slides
+| Method | Endpoint                         | Description                                 |
+| ------ | -------------------------------- | ------------------------------------------- |
+| GET    | `/health`                        | Health check                                |
+| POST   | `/api/v1/auth/login`             | Authenticate and receive JWT token          |
+| POST   | `/api/v1/documents/upload`       | Upload PDF/TXT (max 5MB)                    |
+| GET    | `/api/v1/documents/`             | List all documents for authenticated tenant |
+| POST   | `/api/v1/jobs/`                  | Queue a document for processing             |
+| GET    | `/api/v1/jobs/{job_id}`          | Poll job processing status                  |
+| GET    | `/api/v1/presentations/{job_id}` | Retrieve generated five slide presentation  |
 
 ## Validation Checklist
 
-1. Log in with alice@eduorg.com and password demo1234
-2. Upload a document and queue a job
-3. Poll the job status until it completes
-4. Fetch the presentation to verify the five structured slides
-5. Critical isolation test: use the Alice token to request the Bob job. The response must be a 404 error
+- [ ] Login with `alice@eduorg.com` / `demo1234`
+- [ ] Upload `sample_data/machine_learning_intro.txt`
+- [ ] Click "Process" and watch status change: `uploaded` -> `processing` -> `completed`
+- [ ] Click "View" to verify five structured slides were generated
+- [ ] Critical Test: Logout, login as Bob, verify Alice documents are NOT visible
+- [ ] Security Test: Try accessing `/api/v1/documents/` with Bob token to fetch Alice doc -> must return `404`
 
 ## Tenant Isolation
 
-Every database query includes a tenant filter. The identifier is extracted exclusively from the JWT. Cross tenant access is blocked at the repository layer.
+- Every database query includes a `WHERE tenant_id = :tenant_id` filter
+- Tenant ID is extracted exclusively from the JWT token (never from request body)
+- Cross tenant access is blocked at the repository layer (SQL enforcement)
+- File storage is physically separated: `storage/{tenant_id}/{document_id}/`
 
 ## Project Structure
 
-- backend/src/config contains settings and environment variables
-- backend/src/models contains Pydantic schemas
-- backend/src/repositories contains raw SQL queries
-- backend/src/services contains business logic and async workers
-- backend/src/controllers contains FastAPI routers
-- backend/src/middlewares contains authentication and error handling
+```
+backend/src/
+├── config/           # Settings and environment variables
+├── models/           # Pydantic schemas (request/response)
+├── repositories/     # Raw SQL queries with tenant isolation
+├── services/         # Business logic and async workers
+├── routes/           # FastAPI routers (controllers)
+└── middlewares/      # JWT authentication and error handling
 
-## Note
+frontend/src/
+├── pages/            # Dashboard, JobDetail, LoginPage
+├── components/       # Reusable UI components
+├── hooks/            # useAuth for JWT management
+└── lib/              # API client with axios interceptors
+```
 
-This is a proof of concept. User registration, persistent sessions, and cloud storage are excluded to maintain architectural simplicity.
+## Notes
+
+This is a proof of concept. The following features are intentionally excluded to maintain architectural simplicity:
+
+- User registration (users are seeded on first startup)
+- Persistent sessions (JWT only, no refresh tokens)
+- Cloud storage (local filesystem only)
+- Email verification or password recovery
+- Rate limiting or advanced security headers
 
 ---
 

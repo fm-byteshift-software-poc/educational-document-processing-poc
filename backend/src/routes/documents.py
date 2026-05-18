@@ -5,7 +5,7 @@ from src.services import process_document_upload
 from src.middlewares.auth_middleware import get_current_tenant_id
 from src.repositories import get_all_documents_by_tenant
 
-router = APIRouter(prefix="/documents", tags=["Documents"])
+router = APIRouter(prefix="/documents", tags=["Documents"], redirect_slashes=False)
 
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=201)

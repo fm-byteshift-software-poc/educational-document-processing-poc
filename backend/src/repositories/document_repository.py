@@ -26,11 +26,13 @@ async def get_document_by_id(doc_id: str, tenant_id: str) -> Optional[Dict]:
 
 
 async def get_all_documents_by_tenant(tenant_id: str) -> List[Dict]:
-    """Fetches all documents for a tenant, ordered by upload time (newest first)."""
+    """Fetches all documents for a tenant, including job_id if a completed job exists."""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT id, filename, status, uploaded_at FROM documents "
-            "WHERE tenant_id = :tenant_id ORDER BY uploaded_at DESC",
+            "SELECT d.id, d.filename, d.status, d.uploaded_at, j.id as job_id "
+            "FROM documents d "
+            "LEFT JOIN presentation_jobs j ON d.id = j.document_id AND j.processing_status = 'completed' "
+            "WHERE d.tenant_id = :tenant_id ORDER BY d.uploaded_at DESC",
             {"tenant_id": tenant_id}
         )
         rows = await cursor.fetchall()
