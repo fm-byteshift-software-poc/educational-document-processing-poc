@@ -2,6 +2,62 @@
 
 A proof of concept demonstrating a tenant isolated pipeline that converts uploaded educational documents into structured five slide presentations using AI (Llama 3.1). The focus is on data layer tenant isolation, asynchronous processing, and intelligent content transformation.
 
+## Live Demo
+
+This PoC is deployed and publicly accessible for testing:
+
+| Component         | URL                                                           | Status |
+| ----------------- | ------------------------------------------------------------- | ------ |
+| Frontend          | https://educational-document-processing-poc.vercel.app/       | Active |
+| Backend API       | https://educational-document-processing-poc.onrender.com      | Active |
+| API Documentation | https://educational-document-processing-poc.onrender.com/docs | Active |
+
+### Quick Test Credentials
+
+Use these accounts to test tenant isolation:
+
+**Alice (Educational Organization)**
+
+- Email: `alice@eduorg.com`
+- Password: `demo1234`
+
+**Bob (Training Company)**
+
+- Email: `bob@trainco.com`
+- Password: `demo5678`
+
+### Testing Workflow
+
+1. Access the frontend: https://educational-document-processing-poc.vercel.app/
+2. Login with Alice credentials
+3. Upload a document or use one from the `sample_data/` folder
+4. Click "Process" and wait ~15-30 seconds for AI generation
+5. Click "View" to see the structured presentation
+6. Logout and login as Bob to verify tenant isolation
+
+### Important Notes
+
+- The backend uses SQLite on Render free tier. All data (users, documents, uploads) is volatile and will be lost on redeploy or after ~15 minutes of inactivity.
+- The first request after inactivity may take 30-60 seconds due to cold start on Render free tier.
+- For persistent storage and production use, configure PostgreSQL and cloud storage as described in the "Notes" section.
+
+### API Access
+
+Direct API calls can be made to the backend:
+
+````bash
+# Health check
+curl https://educational-document-processing-poc.onrender.com/health
+
+# Login
+curl -X POST https://educational-document-processing-poc.onrender.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@eduorg.com","password":"demo1234"}'
+
+# List documents (requires JWT from login)
+curl https://educational-document-processing-poc.onrender.com/api/v1/documents/ \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE"
+
 ## Quick Start
 
 ### Backend Setup
@@ -25,7 +81,7 @@ cp .env.example .env
 
 # 5. Run the server
 uvicorn src.main:app --reload
-```
+````
 
 Backend runs on: http://localhost:8000  
 API Docs: http://localhost:8000/docs
